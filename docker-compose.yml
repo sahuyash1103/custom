@@ -1,0 +1,61 @@
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - kafka_network
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    container_name: kafka
+    environment:
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_BROKER_ID: 1
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    networks:
+      - kafka_network
+
+  python-framework:
+    build: ./framework
+    container_name: python_framework
+    environment:
+      - DATABASE_URL=postgresql://postgres:root@db:5432/mydatabase
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_GROUP_ID=python-group
+      - KAFKA_AUTO_OFFSET_RESET=earliest
+    ports:
+      - "8000:8000"
+    depends_on:
+      - kafka
+      - db
+    networks:
+      - kafka_network
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      
+  db:
+    image: postgres:13
+    container_name: db
+    shm_size: 128mb
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: mydatabase
+    ports:
+      - "5433:5432"
+    networks:
+      - kafka_network
+      
+networks:
+  kafka_network:
+    driver: bridge
