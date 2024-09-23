@@ -1,18 +1,24 @@
 import os
+import threading
 from confluent_kafka import Consumer, KafkaError, Producer, KafkaException
 from confluent_kafka.admin import AdminClient, NewTopic
 from sqlalchemy.orm import Session
 from app.models import ActionTrigger
 from app.database import SessionLocal
 from .actions import run_action
+import logging
 
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 
 class KafkaActionHandler:
     def __init__(self):
         # Kafka configuration with environment defaults
         self.kafka_config = {
             'bootstrap.servers': os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'localhost:9092'),
-            'group.id': os.getenv('KAFKA_GROUP_ID', 'action-consumer-group'),
+            'group.id': os.getenv('KAFKA_GROUP_ID', 'action-trigger-group'),
             'auto.offset.reset': os.getenv('KAFKA_AUTO_OFFSET_RESET', 'earliest')
         }
 
@@ -47,7 +53,7 @@ class KafkaActionHandler:
 
             for trigger in triggers:
                 log = run_action(trigger.action.name, db)
-                print(f"Action logs: {log}")
+                logging.info(f"Action logs: {log}")
 
                 # Send log to Kafka
                 log_topic = f"{trigger.action.name}-logs"
@@ -59,6 +65,7 @@ class KafkaActionHandler:
 
     # Subscribe to topics and listen for Kafka messages
     def subscribe_and_listen(self):
+        logging.info("Starting Kafka consumer...")
         consumer = self.create_consumer()
 
         # Fetch unique Kafka topics from the database
@@ -66,7 +73,7 @@ class KafkaActionHandler:
             topics = db.query(ActionTrigger.kafka_topic).distinct().all()
 
         topic_list = [topic.kafka_topic for topic in topics]
-        print(f"Subscribing to topics: {topic_list}")
+        logging.info(f"Subscribing to topics: {topic_list}")
         consumer.subscribe(topic_list)
 
         try:
@@ -83,7 +90,7 @@ class KafkaActionHandler:
 
                 topic = message.topic()
                 message_value = message.value().decode('utf-8')
-                print(f"Received message from topic '{topic}': {message_value}")
+                logging.info(f"Received message from topic '{topic}': {message_value}")
 
                 # Handle the event for the corresponding topic
                 self.handle_kafka_event(topic, message_value)
@@ -93,3 +100,9 @@ class KafkaActionHandler:
         finally:
             # Ensure consumer is closed on exit
             consumer.close()
+
+def start_kafka_listener():
+    kafka_handler = KafkaActionHandler()
+    kafka_thread = threading.Thread(target=kafka_handler.subscribe_and_listen)
+    kafka_thread.start()
+    return kafka_thread

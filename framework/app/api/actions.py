@@ -5,6 +5,8 @@ from ..database import get_db
 from typing import List, Optional
 from pydantic import BaseModel
 from datetime import datetime
+from ..kafka_consumer import KafkaActionHandler
+import logging
 
 router = APIRouter()
 
@@ -29,7 +31,7 @@ class ActionTriggerResponse(BaseModel):
     updated_at: str  # Change type to str
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class ActionResponse(BaseModel):
     id: int
@@ -42,7 +44,7 @@ class ActionResponse(BaseModel):
     updated_at: str  # Change type to str
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 @router.post("/actions/")
@@ -129,4 +131,9 @@ def create_trigger(id: int, trigger: ActionTriggerBase, db: Session = Depends(ge
     db.add(new_trigger)
     db.commit()
     db.refresh(new_trigger)
+
+    kafka = KafkaActionHandler()
+    kafka.create_topic(trigger.kafka_topic)
+    kafka.create_topic(f"{action.name}-logs")
+    
     return new_trigger
