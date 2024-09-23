@@ -5,14 +5,15 @@ from .actions import run_action
 from fastapi import  Depends
 from sqlalchemy.orm import Session
 from .database import get_db
-from .kafka_consumer import subscribe_and_listen
+from .kafka_consumer import KafkaActionHandler
 import threading
 
 app = FastAPI()
 
 # Start Kafka consumer in a separate thread when FastAPI starts
 def start_kafka_listener():
-    kafka_thread = threading.Thread(target=subscribe_and_listen, daemon=True)
+    kafka_handler = KafkaActionHandler()
+    kafka_thread = threading.Thread(target=kafka_handler.subscribe_and_listen, daemon=True)
     kafka_thread.start()
 
 @asynccontextmanager
