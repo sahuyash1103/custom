@@ -31,7 +31,7 @@ def run_docker_image(docker_image: str):
         logging.info(f"Docker image {docker_image} completed with logs: {logs}")
 
         # Clean up the container
-        # container.remove()
+        container.remove()
 
         return logs
 

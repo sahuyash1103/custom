@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Enum, DateTime, ForeignKey
 from sqlalchemy.sql import func
-from .database import Base
+from .database import Base, engine
 from sqlalchemy.orm import relationship
 
 class Action(Base):
@@ -28,3 +28,6 @@ class ActionTrigger(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     
     action = relationship("Action", back_populates="triggers")
+
+
+Base.metadata.create_all(bind=engine)
